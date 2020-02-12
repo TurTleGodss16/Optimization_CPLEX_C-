@@ -31,13 +31,13 @@ int main(int, char**) {
 				x[i][j] = IloNumVar(env, 0, 1, ILOBOOL);
 			}
 		}
-		IloArray<IloNumVarArray> c(env, n);
+		IloArray<IloNumArray> c(env);
 		for (int i = 0; i < n; i++)
 		{
-			c[i] = IloNumVarArray(env, n);
+			c.add(IloNumArray(env));
 			for (int j = 0; j < n; j++)
 			{
-				c[i][j] = IloNumVar(env, 1, 1, ILOINT);
+				c[i].add(rand() % 10 + 1);
 			}
 		}
 		//Object
@@ -112,7 +112,7 @@ int main(int, char**) {
 		{
 			for (int j = 0; j < n; j++)
 			{
-				env.out() << cplex.getValue(c[i][j]) << " ";
+				env.out() << c[i][j] << " ";
 			}
 			cout << "\n";
 		}
