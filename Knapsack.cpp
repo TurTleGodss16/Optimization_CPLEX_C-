@@ -3,30 +3,53 @@
 ILOSTLBEGIN
 IloInt n;
 IloInt m;
-IloIntArray p, b;
-void define_data(IloEnv env) {
+//IloInt check;
+//IloIntArray p, b;
+/*void define_data(IloEnv env) {
 	n = 6;
 	m = 10;
 	p = IloIntArray(env, n, 100, 600, 1200, 2400, 500, 2000);
 	b = IloIntArray(env, m, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000);
 //	b = IloIntArray(env, m, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8);
-}
+}*/
 int main(int, char**) {
 	IloEnv env;
 	try {
-		define_data(env);
+		//define_data(env);
 		IloModel model(env);
+		ifstream ss1("ss1.txt");
+		ss1 >> n;
+		ss1 >> m;
+		//ss1 >> check;
+		IloArray<IloNumArray> c(env, m);
+		for (int i = 0; i < m; i++)
+		{
+			c[i] = IloNumArray(env, n);
+		}
+		IloNumArray p(env, n);
+		IloNumArray b(env, m);
+		for (int i = 0; i < n; i++) ss1 >> p[i];
+		for (int i = 0; i < m; i++)
+		{
+			for (int j = 0; j < n; j++)
+			{
+				ss1 >> c[i][j];
+			}
+		}
+		for (int i = 0; i < m; i++) ss1 >> b[i];
+		/*if (check == 3800) cout << "LALALLA";
+		else cout << "Error" << "\n";*/
 		IloIntVarArray x(env, n, 0, 1);
 		IloRangeArray ctr(env, m);
-		IloArray<IloNumArray> r(env);
+	/*	IloArray<IloNumArray> r(env);
 		for (int i = 0; i < m; i++)
 		{
 			r.add(IloNumArray(env));
 			for (int j = 0; j < n; j++)
 			{
-				r[i].add(rand()%10+1);
+				r[i].add(rand()%10 + 1);
 			}
-		}
+		}*/
 		IloExpr obj(env);
 		for (int i = 0; i < n; i++)
 		{
@@ -39,7 +62,7 @@ int main(int, char**) {
 		{
 			for (int j = 0; j < n; ++j)
 			{
-				Ctr1 += r[i][j] * x[j];
+				Ctr1 += c[i][j] * x[j];
 			}
 			ctr[i] = IloRange(env, 0, Ctr1, b[i]);
 			Ctr1.clear();
@@ -58,15 +81,6 @@ int main(int, char**) {
 		for (int i = 0; i < n; i++)
 		{
 			env.out() << cplex.getValue(x[i]) << " ";
-		}
-		cout << endl;
-		for (int i = 0; i < m; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				env.out() << r[i][j] << " ";
-			}
-			cout << "\n";
 		}
 	}
 	catch (IloException & ex) {
