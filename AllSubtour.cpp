@@ -55,7 +55,7 @@ ILOLAZYCONSTRAINTCALLBACK2(AllSubtour,IloArray<IloIntVarArray>, x, IloNum, tol) 
 	{
 			for (j = 0; j < n; ++j)
 			{
-				mod += x[i][j];
+				if(i != j) mod += x[i][j];
 			}
 	}
 	add(mod <= length - 1).end();
@@ -116,7 +116,7 @@ int main(int, char**) {
 		{
 			for (int j = 0; j < n; j++)
 			{
-				obj += c[i][j] * x[i][j];
+				if(i != j) obj += c[i][j] * x[i][j];
 			}
 		}
 		model.add(IloMinimize(env, obj));
@@ -136,7 +136,7 @@ int main(int, char**) {
 		{
 			for (int j = 0; j < n; j++)
 			{
-				if(i != j) obj += x[j][i];
+				obj += x[j][i];
 			}
 			ctr2[i] = IloRange(env, 1, obj, 1);
 			obj.clear();
@@ -181,18 +181,6 @@ int main(int, char**) {
 		IloNumArray seen(env);
 		IloInt length = checkTr(sol, seen, tol);
 
-		if (length < n) {
-			IloExpr mod(env);
-			for (int i = 0; i < n; i++)
-			{
-					for (int j = 0; j < n; j++)
-					{
-						mod += x[i][j];
-					}
-			}
-			cerr << cplex.getValue(mod) << " <= " << length - 1 << endl;
-		}
-		cout << "\n";
 		for (int i = 0; i < n; i++)
 		{
 			for (int j = 0; j < n; j++)
