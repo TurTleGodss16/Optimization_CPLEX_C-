@@ -1,15 +1,29 @@
 #include<ilcplex/ilocplex.h>
 ILOSTLBEGIN
 IloInt n;
-void define_data(IloEnv env) {
+/*void define_data(IloEnv env) {
 	n = 5;
-}
+}*/
 int main(int, char**) {
 	IloEnv env;
 	try {
-		define_data(env);
+		//define_data(env);
 		//n = 5;
 		IloModel model(env);
+		ifstream ss2("ss2.txt");
+		ss2 >> n;
+		IloArray<IloNumArray> c(env, n);
+		for (int i = 0; i < n; ++i)
+		{
+			c[i] = IloNumArray(env, n);
+		}
+		for (int i = 0; i < n; ++i)
+		{
+			for (int j = 0; j < n; ++j)
+			{
+				ss2 >> c[i][j];
+			}
+		}
 		IloArray<IloNumVarArray> x(env, n);
 		//IloArray<IloNumVarArray> x(env, n);
 		IloNumVarArray u(env, n);
@@ -31,15 +45,15 @@ int main(int, char**) {
 				x[i][j] = IloNumVar(env, 0, 1, ILOBOOL);
 			}
 		}
-		IloArray<IloNumArray> c(env);
+		/*IloArray<IloNumVarArray> c(env, n);
 		for (int i = 0; i < n; i++)
 		{
-			c.add(IloNumArray(env));
+			c[i] = IloNumVarArray(env, n);
 			for (int j = 0; j < n; j++)
 			{
-				c[i].add(rand() % 10 + 1);
+				c[i][j] = IloNumVar(env, 1, 1, ILOINT);
 			}
-		}
+		}*/
 		//Object
 		//constr1 sum x[i][j] = 1
 		IloExpr obj(env);
@@ -104,15 +118,6 @@ int main(int, char**) {
 			for (int j = 0; j < n; j++)
 			{
 				env.out() << cplex.getValue(x[i][j]) << " ";
-			}
-			cout << "\n";
-		}
-		cout << "\n";
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				env.out() << c[i][j] << " ";
 			}
 			cout << "\n";
 		}
