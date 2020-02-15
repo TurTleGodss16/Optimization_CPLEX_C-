@@ -29,7 +29,7 @@ IloInt checkTr(IloNumArray2 sol, IloNumArray seen, IloNum tol) {
 		last = curr;
 		curr = i;
 	}
-
+	return length;
 }
 ILOLAZYCONSTRAINTCALLBACK2(AllSubtour,IloArray<IloIntVarArray>, x, IloNum, tol) {
 	IloInt i, j, n = x.getSize();
