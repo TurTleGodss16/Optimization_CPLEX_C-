@@ -1,204 +1,186 @@
+#include<iostream>
+#include<vector>
+#include<queue>
 #include<ilcplex/ilocplex.h>
-ILOSTLBEGIN
-typedef IloArray<IloIntVarArray> arcs;
-IloInt n;
-/*void define_data(IloEnv env) {
-	n = 5;
-}*/
-IloInt checkTr(IloNumArray2 sol, IloNumArray seen, IloNum tol) {
-	IloInt n = sol.getSize();
-	IloInt i, last = -1, length = 0, curr = 0;
-	seen.clear();
-	seen.add(n, 0.0);
-	while (seen[curr] == 0)
-	{
-		length++;
-		seen[curr] = length;
-		for (i = 0; i < curr; i++)
-		{
-			if (i != last && sol[curr][i] >= 1.0 - tol) break;
-		}
-		if (i == curr)
-		{
-			for (i = curr + 1; i < n; i++)
-			{
-				if (i != last && sol[i][curr] >= 1.0 - tol) break;
-			}
-		}
-		if (i == n) return n + 1;
-		last = curr;
-		curr = i;
-	}
-	return length;
+#define eps 1e-6
+using namespace std;
+/*IloInt visit(IloInt v, IloNumArray2 sol, IloNumArray seen, IloNum tol) {
+    seen[v] = 1;
+    IloInt n = sol.getSize();
+    IloInt i;
+    IloInt ret = 1;
+    for (i = 0; i < v; ++i) {
+        if (sol[v][i] > tol && !seen[i]) {
+            ret += visit(i, sol, seen, tol);
+        }
+    }
+    for (i = v + 1; i < n; ++i) {
+        if (sol[i][v] > tol && !seen[i]) {
+            ret += visit(i, sol, seen, tol);
+        }
+    }
+    return ret;
 }
-ILOLAZYCONSTRAINTCALLBACK2(AllSubtour,IloArray<IloIntVarArray>, x, IloNum, tol) {
-	IloInt i, j, n = x.getSize();
-	IloEnv env = getEnv();
-	IloNumArray2 sol(env, n);
-	for (i = 0; i < n; i++)
-	{
-		sol[i] = IloNumArray(env);
-		getValues(sol[i], x[i]);
-	}
-	IloNumArray seen(env);
-	IloInt length = checkTr(sol, seen, tol);
-	if (length >= n)
-	{
-		seen.end();
-		for (i = 0; i < n; i++)
-			sol[i].end();
-		sol.end();
-		return;
-	}
-	IloExpr mod(env);
-	for (i = 0; i < n; i++)
-	{
-			for (j = 0; j < n; ++j)
-			{
-				if(i != j) mod += x[i][j];
-			}
-	}
-	add(mod <= length - 1).end();
-	mod.end();
-	seen.end();
-	for (i = 0; i < n; i++)
-		sol[i].end();
-	sol.end();
 
-	return;
+IloInt checkComponent(IloNumArray2 sol, IloNumArray seen, IloNum tol) {
+    IloInt j, n = sol.getSize();
+    IloInt length = 0;
+    IloInt current = 0;
+    seen.clear();
+    seen.add(n, 0.0);
+    length = visit(0, sol, seen, tol);
+    return length;
 }
-int main(int, char**) {
+*/
+
+class FacilityCallback : public IloCplex::Callback::Function {
+private:
+	FacilityCallback() {}
+	FacilityCallback(const FacilityCallback& tocopy);
+	IloArray<IloNumVarArray> x;
+
+public:
+	FacilityCallback(IloArray<IloNumVarArray>& _x) :
+		x(_x)
+	{}
+	inline void linearCut(const IloCplex::Callback::Context& context) const
+	{
+		int n = x.getSize();
+		vector <vector<double> > d(n);
+		if (context.inRelaxation())
+		{
+			for (int i = 0; i < n; ++i)
+				for (int j = 0; j < n; ++j)
+					d[i].push_back(context.getRelaxationPoint(x[i][j]));
+		}
+		else
+		{
+			for (int i = 0; i < n; ++i)
+				for (int j = 0; j < n; ++j)
+					d[i].push_back(context.getCandidatePoint(x[i][j]));
+		}
+		vector<int> visit(n);//bfs
+		fill(visit.begin(), visit.end(), 0);
+		vector<IloRange> subtourAdd;//constraint subtour
+		for (int i = 0; i < n; ++i)
+			if (!visit[i])
+			{
+				vector<int> vt;
+				queue <int> q;
+				visit[i] = 1;
+				q.push(i);
+				while (!q.empty())
+				{
+					int u = q.front();
+					q.pop();
+					vt.push_back(u);
+					for (int v = 0; v < n; ++v)
+						if (!visit[v] && d[u][v] > eps)
+						{
+							visit[v] = 1;
+							q.push(v);
+						}
+				}
+				if (vt.size() == n || vt.size() == 1) break;
+				IloExpr sum(context.getEnv());
+				for (int u : vt)
+					for (int v : vt) sum += x[u][v];
+				subtourAdd.push_back(sum <= (int)vt.size() - 1);
+				sum.end();
+			}
+		if (context.inRelaxation())
+			for (auto r : subtourAdd)
+				context.addUserCut(r, IloCplex::UseCutPurge, IloFalse);
+		else
+			for (auto r : subtourAdd)
+				context.rejectCandidate(r);
+	}
+	void invoke(const IloCplex::Callback::Context& context);
+};
+
+void FacilityCallback::invoke(const IloCplex::Callback::Context& context)
+{
+	linearCut(context);
+}
+
+int main(int argc, char **argv)
+{
 	IloEnv env;
-	try {
-		//define_data(env);
-		//n = 5;
-		IloModel model(env);
+	try
+	{
 		ifstream ss3("ss3.txt");
+		clock_t start = clock();
+		IloInt n;
 		ss3 >> n;
-		IloArray<IloNumArray> c(env, n);
+		IloNumArray2 d(env, n);
+		for (int i = 0; i < n; i++)
+		{
+			d[i] = IloNumArray(env, n);
+			for (int j = 0; j < n; j++)
+			{
+				ss3 >> d[i][j];
+				//cout << d[i][j] << " ";
+			}
+			//cout << "\n";
+		}
+		IloArray<IloNumVarArray> x(env, n);
+		IloModel model(env);
 		for (int i = 0; i < n; ++i)
 		{
-			c[i] = IloNumArray(env, n);
+			x[i] = IloNumVarArray(env, n, 0, 1, ILOINT);
+			model.add(x[i]);
+		}
+		{
+			IloExpr sum(env);
+			for (int i = 0; i < n; ++i)
+				for (int j = 0; j < n; ++j)
+					sum += d[i][j] * x[i][j];
+			model.add(IloMinimize(env, sum));
+			sum.end();
 		}
 		for (int i = 0; i < n; ++i)
+			model.add(x[i][i] == 0);
+		for (int i = 0; i < n; ++i)
+		{
+			IloExpr sum(env);
+			for (int j = 0; j < n; ++j)
+				sum += x[i][j];
+			model.add(sum == 1);
+			sum.end();
+		}
+		for (int i = 0; i < n; ++i)
+		{
+			IloExpr sum(env);
+			for (int j = 0; j < n; ++j)
+				sum += x[j][i];
+			model.add(sum == 1);
+			sum.end();
+		}
+		IloCplex cplex(model);
+		FacilityCallback cb(x);
+		cplex.use(&cb, IloCplex::Callback::Context::Id::Candidate | IloCplex::Callback::Context::Id::Relaxation);
+		//cplex.solve();
+		cplex.setParam(IloCplex::PreInd, IloFalse);
+		if (cplex.solve())
+			env.out() << "Optimal tour length "
+			<< cplex.getObjValue() << endl;
+		/*for (int i = 0; i < n; ++i)
 		{
 			for (int j = 0; j < n; ++j)
-			{
-				ss3 >> c[i][j];
-			}
-		}
-		IloArray<IloIntVarArray> x(env, n);
-		//IloArray<IloNumVarArray> x(env, n);
-		IloNumVarArray u(env, n);
-		IloRangeArray ctr1(env, n);
-		IloRangeArray ctr2(env, n);
-		//IloArray<IloRangeArray> ctr3(env, n);
-		/*u[0] = IloNumVar(env, 1, 1, ILOINT);
-		for (int i = 1; i < n; i++)
-		{
-			u[i] = IloNumVar(env, 2, n, ILOINT);
-		}*/
-		for (int i = 0; i < n; i++)
-			x[i] = IloIntVarArray(env, n, 0, 1);
-		/*IloArray<IloNumVarArray> c(env, n);
-		for (int i = 0; i < n; i++)
-		{
-			c[i] = IloNumVarArray(env, n);
-			for (int j = 0; j < n; j++)
-			{
-				c[i][j] = IloNumVar(env, 1, 1, ILOINT);
-			}
-		}*/
-		//Object
-		//constr1 sum x[i][j] = 1
-		IloExpr obj(env);
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				if(i != j) obj += c[i][j] * x[i][j];
-			}
-		}
-		model.add(IloMinimize(env, obj));
-		obj.clear();
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				if(i != j) obj += x[i][j];
-			}
-			ctr1[i] = IloRange(env, 1, obj, 1);
-			obj.clear();
-		}
-		model.add(ctr1);
-		//constr2 sum x[j][i] = 1
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				obj += x[j][i];
-			}
-			ctr2[i] = IloRange(env, 1, obj, 1);
-			obj.clear();
-		}
-		model.add(ctr2);
-		/*//constr3 u[i]-u[j]+n*x[i][j] <= n-1;
-		ctr3[0] = IloRangeArray(env);
-		for (int i = 1; i < n; i++)
-		{
-			ctr3[i] = IloRangeArray(env, n);
-			for (int j = 1; j < n; j++)
-			{
-				obj = u[i] - u[j] + n * x[i][j];
-				ctr3[i][j] = IloRange(env, -IloInfinity, obj, n - 1);
-				obj.clear();
-			}
-			model.add(ctr3[i]);
-		}*///SubTour elimination
-
-		// object
-		//obj.end();
-		//result
-		IloCplex cplex(model);
-		IloNum tol = cplex.getParam(IloCplex::EpInt);
-		IloCplex::Callback sec = cplex.use(
-			AllSubtour(env, x, tol));
-
-		cplex.setOut(env.getNullStream());
-		cplex.setWarning(env.getNullStream());
-		cplex.solve();
-		if (cplex.getStatus() == IloAlgorithm::Infeasible)
-			env.out() << "No solution" << endl;
-		env.out() << "Solution status: " << cplex.getStatus() << endl;
-		env.out() << cplex.getObjValue() << endl;
-
-		IloNumArray2 sol(env, n);
-		for (int i = 0; i < n; i++)
-		{
-			sol[i] = IloNumArray(env);
-			cplex.getValues(sol[i], x[i]);
-		}
-		IloNumArray seen(env);
-		IloInt length = checkTr(sol, seen, tol);
-
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
 			{
 				env.out() << cplex.getValue(x[i][j]) << " ";
 			}
 			cout << "\n";
-		}
-		//assert(length == n);
+		}*/
 
-		sec.end();
 	}
-	catch (IloException & ex) {
-		cerr << "Error :" << ex << endl;
+	catch (const IloException & e) {
+		cerr << "Exception caught: " << e << endl;
 	}
 	catch (...) {
-		cerr << "Error" << endl;
+		cerr << "Unknown exception caught!" << endl;
 	}
+
 	env.end();
 	return 0;
 }
